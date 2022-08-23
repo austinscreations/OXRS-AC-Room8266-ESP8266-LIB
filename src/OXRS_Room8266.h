@@ -21,7 +21,7 @@
 // RGBW LED
 #define       LED_PIN                   0
 #define       LED_COUNT                 1
-#define       LED_RX_TX_MS              50
+#define       LED_TIMEOUT_MS            50
 
 // REST API
 #define       REST_API_PORT             80
@@ -49,8 +49,8 @@ class OXRS_Room8266 : public Print
     void apiPost(const char * path, Router::Middleware * middleware);
         
     // Helpers for publishing to stat/ and tele/ topics
-    boolean publishStatus(JsonVariant json);
-    boolean publishTelemetry(JsonVariant json);
+    bool publishStatus(JsonVariant json);
+    bool publishTelemetry(JsonVariant json);
 
     // Implement Print.h wrapper
     virtual size_t write(uint8_t);
@@ -64,7 +64,7 @@ class OXRS_Room8266 : public Print
     void _initialiseLed(void);
     void _updateLed(void);
 
-    boolean _isNetworkConnected(void);
+    bool _isNetworkConnected(void);
 };
 
 #endif

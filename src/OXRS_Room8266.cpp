@@ -35,8 +35,8 @@ OXRS_MQTT _mqtt(_mqttClient);
 // REST API
 OXRS_API _api(_mqtt);
 
-// RGBW LED
-Adafruit_NeoPixel _led(LED_COUNT, LED_PIN, NEO_RGBW + NEO_KHZ400);
+// RGBW LED (actually GRBW)
+Adafruit_NeoPixel _led(LED_COUNT, LED_PIN, NEO_GRBW);
 
 // Logging (topic updated once MQTT connects successfully)
 MqttLogger _logger(_mqttClient, "log", MqttLoggerMode::MqttAndSerial);
@@ -49,9 +49,8 @@ DynamicJsonDocument _fwCommandSchema(4096);
 jsonCallback _onConfig;
 jsonCallback _onCommand;
 
-// Network activity LED timers
-uint32_t _lastTx = 0L;
-uint32_t _lastRx = 0L;
+// LED timer
+uint32_t _ledOnMillis = 0L;
 
 // stack size counter (for determine used heap size on ESP8266)
 char * _stack_start;
@@ -80,26 +79,24 @@ void _mergeJson(JsonVariant dst, JsonVariantConst src)
 }
 
 /* LED helpers */
-void _ledOff(void)
+void _ledRGBW(uint8_t r, uint8_t g, uint8_t b, uint8_t w)
 {
-  _led.setPixelColor(0, 0, 0, 0, 0);
+  _led.setPixelColor(0, r, g, b, w);
   _led.show();
 }
 
 void _ledRx(void)
 {
-  _led.setPixelColor(0, 255, 0, 0, 0);
-  _led.show();
-  
-  _lastRx = millis();
+  // yellow
+  _ledRGBW(255, 255, 0, 0);
+  _ledOnMillis = millis();
 }
 
 void _ledTx(void)
 {
-  _led.setPixelColor(0, 0, 255, 0, 0);
-  _led.show();
-
-  _lastTx = millis();
+  // orange
+  _ledRGBW(255, 100, 0, 0);
+  _ledOnMillis = millis();
 }
 
 /* Adoption info builders */
@@ -337,6 +334,9 @@ void OXRS_Room8266::begin(jsonCallback config, jsonCallback command)
   // We wrap the callbacks so we can intercept messages intended for the Rack32
   _onConfig = config;
   _onCommand = command;
+  
+  // Set up the RGBW LED
+  _initialiseLed();
 
   // Set up network and obtain an IP address
   byte mac[6];
@@ -347,9 +347,6 @@ void OXRS_Room8266::begin(jsonCallback config, jsonCallback command)
 
   // Set up the REST API
   _initialiseRestApi();
-  
-  // Set up the RGBW LED
-  _initialiseLed();
 }
 
 void OXRS_Room8266::loop(void)
@@ -375,7 +372,7 @@ void OXRS_Room8266::loop(void)
 #endif
   }
 
-  // Check LED timers
+  // Update the LED
   _updateLed();
 }
 
@@ -401,22 +398,22 @@ void OXRS_Room8266::apiPost(const char * path, Router::Middleware * middleware)
   _api.post(path, middleware);
 }
 
-boolean OXRS_Room8266::publishStatus(JsonVariant json)
+bool OXRS_Room8266::publishStatus(JsonVariant json)
 {
   // Exit early if no network connection
   if (!_isNetworkConnected()) { return false; }
 
-  boolean success = _mqtt.publishStatus(json);
+  bool success = _mqtt.publishStatus(json);
   if (success) { _ledTx(); }
   return success;
 }
 
-boolean OXRS_Room8266::publishTelemetry(JsonVariant json)
+bool OXRS_Room8266::publishTelemetry(JsonVariant json)
 {
   // Exit early if no network connection
   if (!_isNetworkConnected()) { return false; }
 
-  boolean success = _mqtt.publishTelemetry(json);
+  bool success = _mqtt.publishTelemetry(json);
   if (success) { _ledTx(); }
   return success;
 }
@@ -442,6 +439,9 @@ void OXRS_Room8266::_initialiseNetwork(byte * mac)
   char mac_display[18];
   sprintf_P(mac_display, PSTR("%02X:%02X:%02X:%02X:%02X:%02X"), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
+  // Attempt to connect
+  bool success = false;
+  
 #if defined(WIFI_MODE)
   _logger.print(F("[room] wifi mac address: "));
   _logger.println(mac_display);
@@ -452,7 +452,7 @@ void OXRS_Room8266::_initialiseNetwork(byte * mac)
   // Connect using saved creds, or start captive portal if none found
   // NOTE: Blocks until connected or the portal is closed
   WiFiManager wm;
-  bool success = wm.autoConnect("OXRS_WiFi", "superhouse");
+  success = wm.autoConnect("OXRS_WiFi", "superhouse");
 
   _logger.print(F("[room] ip address: "));
   _logger.println(success ? WiFi.localIP() : IPAddress(0, 0, 0, 0));
@@ -473,7 +473,7 @@ void OXRS_Room8266::_initialiseNetwork(byte * mac)
   delay(350);
 
   // Connect ethernet and get an IP address via DHCP
-  bool success = Ethernet.begin(mac, DHCP_TIMEOUT_MS, DHCP_RESPONSE_TIMEOUT_MS);
+  success = Ethernet.begin(mac, DHCP_TIMEOUT_MS, DHCP_RESPONSE_TIMEOUT_MS);
   
   _logger.print(F("[room] ip address: "));
   _logger.println(success ? Ethernet.localIP() : IPAddress(0, 0, 0, 0));
@@ -518,34 +518,58 @@ void OXRS_Room8266::_initialiseRestApi(void)
 
 void OXRS_Room8266::_initialiseLed(void)
 {
+  // Start the LED driver
   _led.begin();
-  _led.show();
+
+  // Flash the LED to indicate we are booting
+  _ledRGBW(255, 0, 0, 0);
+  delay(500);
+  _ledRGBW(0, 255, 0, 0);
+  delay(500);
+  _ledRGBW(0, 0, 255, 0);
+  delay(500);
+  _ledRGBW(0, 0, 0, 255);
+  delay(500);
+  _ledRGBW(0, 0, 0, 0);
 }
 
 void OXRS_Room8266::_updateLed(void)
 {
-  // Turn off RX LED if timed out
-  if (_lastRx)
+  // Don't bother with network checks if we have an activity LED showing
+  if (_ledOnMillis)
   {
-    if ((millis() - _lastRx) > LED_RX_TX_MS)
+    // Turn off LED if timed out
+    if ((millis() - _ledOnMillis) > LED_TIMEOUT_MS)
     {
-      _ledOff();
-      _lastRx = 0L;
+      _ledRGBW(0, 0, 0, 0);
+      _ledOnMillis = 0L;
     }
   }
- 
-  // Turn off TX LED if timed out
-  if (_lastTx)
+  else
   {
-    if ((millis() - _lastTx) > LED_RX_TX_MS)
+    // Check network connection state
+    if (!_isNetworkConnected())
     {
-      _ledOff();
-      _lastTx = 0L;
+      // RED if no network at all
+      _ledRGBW(50, 0, 0, 0);
     }
-  }  
+    else
+    {
+      if (!_mqtt.connected())
+      {
+        // BLUE if network, but no MQTT connection
+        _ledRGBW(0, 0, 50, 0);        
+      }
+      else
+      {
+        // GREEN if everything ok
+        _ledRGBW(0, 50, 0, 0);        
+      }
+    }
+  }
 }
 
-boolean OXRS_Room8266::_isNetworkConnected(void)
+bool OXRS_Room8266::_isNetworkConnected(void)
 {
 #if defined(WIFI_MODE)
   return WiFi.status() == WL_CONNECTED;
