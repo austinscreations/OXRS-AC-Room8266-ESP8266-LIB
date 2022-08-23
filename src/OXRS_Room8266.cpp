@@ -8,6 +8,7 @@
 #include <Wire.h>                     // For I2C
 #include <ESP8266WiFi.h>              // For networking
 #include <Ethernet.h>                 // For networking
+#include <Adafruit_NeoPixel.h>        // For RGBW LED
 #include <MqttLogger.h>               // For logging
 
 #if defined(WIFI_MODE)
@@ -34,6 +35,9 @@ OXRS_MQTT _mqtt(_mqttClient);
 // REST API
 OXRS_API _api(_mqtt);
 
+// RGBW LED
+Adafruit_NeoPixel _led(LED_COUNT, LED_PIN, NEO_RGBW + NEO_KHZ400);
+
 // Logging (topic updated once MQTT connects successfully)
 MqttLogger _logger(_mqttClient, "log", MqttLoggerMode::MqttAndSerial);
 
@@ -44,6 +48,10 @@ DynamicJsonDocument _fwCommandSchema(4096);
 // MQTT callbacks wrapped by _mqttConfig/_mqttCommand
 jsonCallback _onConfig;
 jsonCallback _onCommand;
+
+// Network activity LED timers
+uint32_t _lastTx = 0L;
+uint32_t _lastRx = 0L;
 
 // stack size counter (for determine used heap size on ESP8266)
 char * _stack_start;
@@ -69,6 +77,29 @@ void _mergeJson(JsonVariant dst, JsonVariantConst src)
   {
     dst.set(src);
   }
+}
+
+/* LED helpers */
+void _ledOff(void)
+{
+  _led.setPixelColor(0, 0, 0, 0, 0);
+  _led.show();
+}
+
+void _ledRx(void)
+{
+  _led.setPixelColor(0, 255, 0, 0, 0);
+  _led.show();
+  
+  _lastRx = millis();
+}
+
+void _ledTx(void)
+{
+  _led.setPixelColor(0, 0, 255, 0, 0);
+  _led.show();
+
+  _lastTx = millis();
 }
 
 /* Adoption info builders */
@@ -186,7 +217,7 @@ void _mqttConnected()
   _mqtt.publishAdopt(_api.getAdopt(json.as<JsonVariant>()));
 
   // Log the fact we are now connected
-  _logger.println("[ro82] mqtt connected");
+  _logger.println("[room] mqtt connected");
 }
 
 void _mqttDisconnected(int state) 
@@ -196,31 +227,31 @@ void _mqttDisconnected(int state)
   switch (state)
   {
     case MQTT_CONNECTION_TIMEOUT:
-      _logger.println(F("[ro82] mqtt connection timeout"));
+      _logger.println(F("[room] mqtt connection timeout"));
       break;
     case MQTT_CONNECTION_LOST:
-      _logger.println(F("[ro82] mqtt connection lost"));
+      _logger.println(F("[room] mqtt connection lost"));
       break;
     case MQTT_CONNECT_FAILED:
-      _logger.println(F("[ro82] mqtt connect failed"));
+      _logger.println(F("[room] mqtt connect failed"));
       break;
     case MQTT_DISCONNECTED:
-      _logger.println(F("[ro82] mqtt disconnected"));
+      _logger.println(F("[room] mqtt disconnected"));
       break;
     case MQTT_CONNECT_BAD_PROTOCOL:
-      _logger.println(F("[ro82] mqtt bad protocol"));
+      _logger.println(F("[room] mqtt bad protocol"));
       break;
     case MQTT_CONNECT_BAD_CLIENT_ID:
-      _logger.println(F("[ro82] mqtt bad client id"));
+      _logger.println(F("[room] mqtt bad client id"));
       break;
     case MQTT_CONNECT_UNAVAILABLE:
-      _logger.println(F("[ro82] mqtt unavailable"));
+      _logger.println(F("[room] mqtt unavailable"));
       break;
     case MQTT_CONNECT_BAD_CREDENTIALS:
-      _logger.println(F("[ro82] mqtt bad credentials"));
+      _logger.println(F("[room] mqtt bad credentials"));
       break;      
     case MQTT_CONNECT_UNAUTHORIZED:
-      _logger.println(F("[ro82] mqtt unauthorised"));
+      _logger.println(F("[room] mqtt unauthorised"));
       break;      
   }
 }
@@ -239,24 +270,24 @@ void _mqttCommand(JsonVariant json)
 
 void _mqttCallback(char * topic, byte * payload, int length) 
 {
-  // Update screen
-  //_screen.triggerMqttRxLed();
+  // Update LED
+  _ledRx();
 
   // Pass down to our MQTT handler and check it was processed ok
   int state = _mqtt.receive(topic, payload, length);
   switch (state)
   {
     case MQTT_RECEIVE_ZERO_LENGTH:
-      _logger.println(F("[ro82] empty mqtt payload received"));
+      _logger.println(F("[room] empty mqtt payload received"));
       break;
     case MQTT_RECEIVE_JSON_ERROR:
-      _logger.println(F("[ro82] failed to deserialise mqtt json payload"));
+      _logger.println(F("[room] failed to deserialise mqtt json payload"));
       break;
     case MQTT_RECEIVE_NO_CONFIG_HANDLER:
-      _logger.println(F("[ro82] no mqtt config handler"));
+      _logger.println(F("[room] no mqtt config handler"));
       break;
     case MQTT_RECEIVE_NO_COMMAND_HANDLER:
-      _logger.println(F("[ro82] no mqtt command handler"));
+      _logger.println(F("[room] no mqtt command handler"));
       break;
   }
 }
@@ -299,7 +330,7 @@ void OXRS_Room8266::begin(jsonCallback config, jsonCallback command)
   _getFirmwareJson(json.as<JsonVariant>());
 
   // Log firmware details
-  _logger.print(F("[ro82] "));
+  _logger.print(F("[room] "));
   serializeJson(json, _logger);
   _logger.println();
 
@@ -316,6 +347,9 @@ void OXRS_Room8266::begin(jsonCallback config, jsonCallback command)
 
   // Set up the REST API
   _initialiseRestApi();
+  
+  // Set up the RGBW LED
+  _initialiseLed();
 }
 
 void OXRS_Room8266::loop(void)
@@ -340,6 +374,9 @@ void OXRS_Room8266::loop(void)
     _api.loop(&client);
 #endif
   }
+
+  // Check LED timers
+  _updateLed();
 }
 
 void OXRS_Room8266::setConfigSchema(JsonVariant json)
@@ -370,7 +407,7 @@ boolean OXRS_Room8266::publishStatus(JsonVariant json)
   if (!_isNetworkConnected()) { return false; }
 
   boolean success = _mqtt.publishStatus(json);
-  //if (success) { _screen.triggerMqttTxLed(); }
+  if (success) { _ledTx(); }
   return success;
 }
 
@@ -380,7 +417,7 @@ boolean OXRS_Room8266::publishTelemetry(JsonVariant json)
   if (!_isNetworkConnected()) { return false; }
 
   boolean success = _mqtt.publishTelemetry(json);
-  //if (success) { _screen.triggerMqttTxLed(); }
+  if (success) { _ledTx(); }
   return success;
 }
 
@@ -406,7 +443,7 @@ void OXRS_Room8266::_initialiseNetwork(byte * mac)
   sprintf_P(mac_display, PSTR("%02X:%02X:%02X:%02X:%02X:%02X"), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
 #if defined(WIFI_MODE)
-  _logger.print(F("[ro82] wifi mac address: "));
+  _logger.print(F("[room] wifi mac address: "));
   _logger.println(mac_display);
 
   // Ensure we are in the correct WiFi mode
@@ -417,10 +454,10 @@ void OXRS_Room8266::_initialiseNetwork(byte * mac)
   WiFiManager wm;
   bool success = wm.autoConnect("OXRS_WiFi", "superhouse");
 
-  _logger.print(F("[ro82] ip address: "));
+  _logger.print(F("[room] ip address: "));
   _logger.println(success ? WiFi.localIP() : IPAddress(0, 0, 0, 0));
 #else
-  _logger.print(F("[ro82] ethernet mac address: "));
+  _logger.print(F("[room] ethernet mac address: "));
   _logger.println(mac_display);
 
   // Initialise ethernet library
@@ -438,7 +475,7 @@ void OXRS_Room8266::_initialiseNetwork(byte * mac)
   // Connect ethernet and get an IP address via DHCP
   bool success = Ethernet.begin(mac, DHCP_TIMEOUT_MS, DHCP_RESPONSE_TIMEOUT_MS);
   
-  _logger.print(F("[ro82] ip address: "));
+  _logger.print(F("[room] ip address: "));
   _logger.println(success ? Ethernet.localIP() : IPAddress(0, 0, 0, 0));
 #endif
 }
@@ -477,6 +514,35 @@ void OXRS_Room8266::_initialiseRestApi(void)
 
   // Start listening
   _server.begin();
+}
+
+void OXRS_Room8266::_initialiseLed(void)
+{
+  _led.begin();
+  _led.show();
+}
+
+void OXRS_Room8266::_updateLed(void)
+{
+  // Turn off RX LED if timed out
+  if (_lastRx)
+  {
+    if ((millis() - _lastRx) > LED_RX_TX_MS)
+    {
+      _ledOff();
+      _lastRx = 0L;
+    }
+  }
+ 
+  // Turn off TX LED if timed out
+  if (_lastTx)
+  {
+    if ((millis() - _lastTx) > LED_RX_TX_MS)
+    {
+      _ledOff();
+      _lastTx = 0L;
+    }
+  }  
 }
 
 boolean OXRS_Room8266::_isNetworkConnected(void)

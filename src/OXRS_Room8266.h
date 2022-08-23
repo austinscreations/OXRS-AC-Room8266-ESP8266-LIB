@@ -18,6 +18,11 @@
 #define       I2C_SDA                   4
 #define       I2C_SCL                   5
 
+// RGBW LED
+#define       LED_PIN                   0
+#define       LED_COUNT                 1
+#define       LED_RX_TX_MS              50
+
 // REST API
 #define       REST_API_PORT             80
 
@@ -55,6 +60,9 @@ class OXRS_Room8266 : public Print
     void _initialiseNetwork(byte * mac);
     void _initialiseMqtt(byte * mac);
     void _initialiseRestApi(void);
+    
+    void _initialiseLed(void);
+    void _updateLed(void);
 
     boolean _isNetworkConnected(void);
 };
