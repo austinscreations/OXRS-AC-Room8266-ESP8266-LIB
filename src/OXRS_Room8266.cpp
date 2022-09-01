@@ -188,6 +188,11 @@ void _getCommandSchemaJson(JsonVariant json)
   {
     _mergeJson(properties, _fwCommandSchema.as<JsonVariant>());
   }
+
+  // Room8266 commands
+  JsonObject restart = properties.createNestedObject("restart");
+  restart["title"] = "Restart";
+  restart["type"] = "boolean";
 }
 
 /* API callbacks */
@@ -261,6 +266,12 @@ void _mqttConfig(JsonVariant json)
 
 void _mqttCommand(JsonVariant json)
 {
+  // Check for Room8266 commands
+  if (json.containsKey("restart") && json["restart"].as<bool>())
+  {
+    ESP.restart();
+  }
+
   // Pass on to the firmware callback
   if (_onCommand) { _onCommand(json); }
 }
