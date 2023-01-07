@@ -65,11 +65,18 @@ uint32_t getStackSize()
 /* JSON helpers */
 void _mergeJson(JsonVariant dst, JsonVariantConst src)
 {
-  if (src.is<JsonObject>())
+  if (src.is<JsonObjectConst>())
   {
-    for (auto kvp : src.as<JsonObjectConst>())
+    for (JsonPairConst kvp : src.as<JsonObjectConst>())
     {
-      _mergeJson(dst[kvp.key()].to<JsonVariant>(), kvp.value());
+      if (dst[kvp.key()]) 
+      {
+        _mergeJson(dst[kvp.key()], kvp.value());
+      }
+      else
+      {
+        dst[kvp.key()] = kvp.value();
+      }
     }
   }
   else
