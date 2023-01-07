@@ -69,7 +69,8 @@ void _mergeJson(JsonVariant dst, JsonVariantConst src)
   {
     for (auto kvp : src.as<JsonObjectConst>())
     {
-      _mergeJson(dst.containsKey(kvp.key()) ? dst[kvp.key()] : dst[kvp.key()].to<JsonVariant>(), kvp.value());
+      JsonVariant merge = dst.containsKey(kvp.key()) ? dst[kvp.key()] : dst[kvp.key()].to<JsonVariant>();
+      _mergeJson(merge, kvp.value());
     }
   }
   else
