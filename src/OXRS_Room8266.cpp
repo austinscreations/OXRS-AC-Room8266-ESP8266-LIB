@@ -396,12 +396,14 @@ void OXRS_Room8266::loop(void)
 
 void OXRS_Room8266::setConfigSchema(JsonVariant json)
 {
-  _mergeJson(_fwConfigSchema.to<JsonVariant>(), json);
+  _fwConfigSchema.clear();
+  _mergeJson(_fwConfigSchema.as<JsonVariant>(), json);
 }
 
 void OXRS_Room8266::setCommandSchema(JsonVariant json)
 {
-  _mergeJson(_fwCommandSchema.to<JsonVariant>(), json);
+  _fwCommandSchema.clear();
+  _mergeJson(_fwCommandSchema.as<JsonVariant>(), json);
 }
 
 void OXRS_Room8266::apiGet(const char * path, Router::Middleware * middleware)
