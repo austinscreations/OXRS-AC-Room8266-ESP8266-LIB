@@ -42,8 +42,8 @@ Adafruit_NeoPixel _led(LED_COUNT, LED_PIN, NEO_GRBW);
 MqttLogger _logger(_mqttClient, "log", MqttLoggerMode::MqttAndSerial);
 
 // Supported firmware config and command schemas
-DynamicJsonDocument _fwConfigSchema(8192);
-DynamicJsonDocument _fwCommandSchema(8192);
+DynamicJsonDocument _fwConfigSchema(JSON_CONFIG_MAX_SIZE);
+DynamicJsonDocument _fwCommandSchema(JSON_COMMAND_MAX_SIZE);
 
 // MQTT callbacks wrapped by _mqttConfig/_mqttCommand
 jsonCallback _onConfig;
@@ -396,14 +396,12 @@ void OXRS_Room8266::loop(void)
 
 void OXRS_Room8266::setConfigSchema(JsonVariant json)
 {
-  _fwConfigSchema.clear();
-  _mergeJson(_fwConfigSchema.as<JsonVariant>(), json);
+  _mergeJson(_fwConfigSchema.to<JsonVariant>(), json);
 }
 
 void OXRS_Room8266::setCommandSchema(JsonVariant json)
 {
-  _fwCommandSchema.clear();
-  _mergeJson(_fwCommandSchema.as<JsonVariant>(), json);
+  _mergeJson(_fwCommandSchema.to<JsonVariant>(), json);
 }
 
 void OXRS_Room8266::apiGet(const char * path, Router::Middleware * middleware)
