@@ -5,7 +5,6 @@
 #include "Arduino.h"
 #include "OXRS_Room8266.h"
 
-#include <Wire.h>                     // For I2C
 #include <ESP8266WiFi.h>              // For networking
 #include <Ethernet.h>                 // For networking
 #include <Adafruit_NeoPixel.h>        // For RGBW LED
