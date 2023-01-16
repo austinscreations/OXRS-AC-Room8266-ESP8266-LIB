@@ -8,6 +8,7 @@
 #include <ESP8266WiFi.h>              // For networking
 #include <Ethernet.h>                 // For networking
 #include <Adafruit_NeoPixel.h>        // For RGBW LED
+#include <LittleFS.h>                 // For file system access
 #include <MqttLogger.h>               // For logging
 
 #if defined(WIFI_MODE)
@@ -131,10 +132,8 @@ void _getSystemJson(JsonVariant json)
   system["sketchSpaceUsedBytes"] = ESP.getSketchSize();
   system["sketchSpaceTotalBytes"] = ESP.getFreeSketchSpace();
 
-  FSInfo fsInfo;
-  SPIFFS.info(fsInfo);  
-  system["fileSystemUsedBytes"] = fsInfo.usedBytes;
-  system["fileSystemTotalBytes"] = fsInfo.totalBytes;
+  system["fileSystemUsedBytes"] = LittleFS.usedBytes();
+  system["fileSystemTotalBytes"] = LittleFS.totalBytes();
 }
 
 void _getNetworkJson(JsonVariant json)
