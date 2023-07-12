@@ -510,7 +510,7 @@ bool OXRS_Room8266::publishHassDiscovery(JsonVariant json, char * component, cha
   }
 
   bool success = _mqtt.publish(json, topic, true);
-  if (success) { _screen.triggerMqttTxLed(); }
+  if (success) { _ledTx(); }
   return success;
 }
 
