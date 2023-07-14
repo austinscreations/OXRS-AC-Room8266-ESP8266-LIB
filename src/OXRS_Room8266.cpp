@@ -407,12 +407,12 @@ void OXRS_Room8266::setCommandSchema(JsonVariant json)
   _mergeJson(_fwCommandSchema.as<JsonVariant>(), json);
 }
 
-OXRS_MQTT * OXRS_Rack32::getMQTT()
+OXRS_MQTT * OXRS_Room8266::getMQTT()
 {
   return &_mqtt;
 }
 
-OXRS_API * OXRS_Rack32::getAPI()
+OXRS_API * OXRS_Room8266::getAPI()
 {
   return &_api;
 }
