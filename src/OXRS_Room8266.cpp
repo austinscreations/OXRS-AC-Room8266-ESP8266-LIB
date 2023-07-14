@@ -49,10 +49,6 @@ DynamicJsonDocument _fwCommandSchema(JSON_COMMAND_MAX_SIZE);
 jsonCallback _onConfig;
 jsonCallback _onCommand;
 
-// Home Assistant self-discovery
-bool g_hassDiscoveryEnabled = false;
-char g_hassDiscoveryTopicPrefix[64] = "homeassistant";
-
 // LED timer
 uint32_t _ledOnMillis = 0L;
 
@@ -285,12 +281,12 @@ void _mqttConfig(JsonVariant json)
   // Home Assistant discovery config
   if (json.containsKey("hassDiscoveryEnabled"))
   {
-    g_hassDiscoveryEnabled = json["hassDiscoveryEnabled"].as<bool>();
+    _mqtt.setHassDiscoveryEnabled(json["hassDiscoveryEnabled"].as<bool>());
   }
 
   if (json.containsKey("hassDiscoveryTopicPrefix"))
   {
-    strcpy(g_hassDiscoveryTopicPrefix, json["hassDiscoveryTopicPrefix"]);
+    _mqtt.setHassDiscoveryTopicPrefix(json["hassDiscoveryTopicPrefix"]);
   }
 
   // Pass on to the firmware callback
@@ -439,14 +435,11 @@ bool OXRS_Room8266::publishTelemetry(JsonVariant json)
 
 bool OXRS_Room8266::isHassDiscoveryEnabled()
 {
-  return g_hassDiscoveryEnabled;
+  return _mqtt.getHassDiscoveryEnabled();
 }
 
 bool OXRS_Room8266::publishHassDiscovery(JsonVariant json, char * component, char * id)
 {
-  // Exit early if Home Assistant discovery has been disabled
-  if (!g_hassDiscoveryEnabled) { return false; }
-
   // Exit early if no network connection
   if (!_isNetworkConnected()) { return false; }
 
@@ -455,11 +448,7 @@ bool OXRS_Room8266::publishHassDiscovery(JsonVariant json, char * component, cha
   json["dev"]["mdl"] = FW_NAME;
   json["dev"]["sw"] = STRINGIFY(FW_VERSION);
 
-  // Build the discovery topic
-  char topic[64];
-  sprintf_P(topic, PSTR("%s/%s/%s/%s/config"), g_hassDiscoveryTopicPrefix, component, _mqtt.getClientId(), id);
-
-  bool success = _mqtt.publishHassDiscovery(json, topic);
+  bool success = _mqtt.publishHassDiscovery(json, component, id);
   if (success) { _ledTx(); }
   return success;
 }
