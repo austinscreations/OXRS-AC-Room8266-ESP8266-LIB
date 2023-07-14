@@ -445,7 +445,11 @@ bool OXRS_Room8266::publishHassDiscovery(JsonVariant json, char * component, cha
   json["dev"]["mdl"] = FW_NAME;
   json["dev"]["sw"] = STRINGIFY(FW_VERSION);
 
-  bool success = _mqtt.publishHassDiscovery(json, g_hassDiscoveryTopicPrefix, component, id);
+  // Build the discovery topic
+  char topic[64];
+  sprintf_P(topic, PSTR("%s/%s/%s/%s/config"), g_hassDiscoveryTopicPrefix, component, _mqtt.getClientId(), id);
+
+  bool success = _mqtt.publishHassDiscovery(json, topic);
   if (success) { _ledTx(); }
   return success;
 }
