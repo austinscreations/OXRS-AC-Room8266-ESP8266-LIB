@@ -29,14 +29,6 @@
 class OXRS_Room8266 : public Print
 {
   public:
-    // These are only needed if performing manual configuration in your sketch, otherwise
-    // config is provisioned via the API and bootstrap page
-    void setMqttBroker(const char * broker, uint16_t port);
-    void setMqttClientId(const char * clientId);
-    void setMqttAuth(const char * username, const char * password);
-    void setMqttTopicPrefix(const char * prefix);
-    void setMqttTopicSuffix(const char * suffix);
-
     void begin(jsonCallback config, jsonCallback command);
     void loop(void);
 
@@ -44,17 +36,18 @@ class OXRS_Room8266 : public Print
     void setConfigSchema(JsonVariant json);
     void setCommandSchema(JsonVariant json);
 
-    // Helpers for registering custom REST API endpoints
-    void apiGet(const char * path, Router::Middleware * middleware);
-    void apiPost(const char * path, Router::Middleware * middleware);
-        
+    // Return a pointer to the MQTT library
+    OXRS_MQTT * getMQTT(void);
+
+    // Return a pointer to the API library
+    OXRS_API * getAPI(void);
+
     // Helpers for publishing to stat/ and tele/ topics
     bool publishStatus(JsonVariant json);
     bool publishTelemetry(JsonVariant json);
 
     // Helpers for Home Assistant discovery
     bool isHassDiscoveryEnabled();
-    void getHassDiscoveryJson(JsonVariant json, char * id, bool isTelemetry = false);
     bool publishHassDiscovery(JsonVariant json, char * component, char * id);
 
     // Implement Print.h wrapper

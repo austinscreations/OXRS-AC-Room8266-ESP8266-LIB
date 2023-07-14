@@ -334,31 +334,6 @@ void _mqttCallback(char * topic, byte * payload, int length)
 }
 
 /* Main program */
-void OXRS_Room8266::setMqttBroker(const char * broker, uint16_t port)
-{
-  _mqtt.setBroker(broker, port);
-}
-
-void OXRS_Room8266::setMqttClientId(const char * clientId)
-{
-  _mqtt.setClientId(clientId);
-}
-
-void OXRS_Room8266::setMqttAuth(const char * username, const char * password)
-{
-  _mqtt.setAuth(username, password);
-}
-
-void OXRS_Room8266::setMqttTopicPrefix(const char * prefix)
-{
-  _mqtt.setTopicPrefix(prefix);
-}
-
-void OXRS_Room8266::setMqttTopicSuffix(const char * suffix)
-{
-  _mqtt.setTopicSuffix(suffix);
-}
-
 void OXRS_Room8266::begin(jsonCallback config, jsonCallback command)
 {
   // Store the address of the stack at startup so we can determine
@@ -432,16 +407,6 @@ void OXRS_Room8266::setCommandSchema(JsonVariant json)
   _mergeJson(_fwCommandSchema.as<JsonVariant>(), json);
 }
 
-void OXRS_Room8266::apiGet(const char * path, Router::Middleware * middleware)
-{
-  _api.get(path, middleware);
-}
-
-void OXRS_Room8266::apiPost(const char * path, Router::Middleware * middleware)
-{
-  _api.post(path, middleware);
-}
-
 bool OXRS_Room8266::publishStatus(JsonVariant json)
 {
   // Exit early if no network connection
@@ -467,28 +432,6 @@ bool OXRS_Room8266::isHassDiscoveryEnabled()
   return g_hassDiscoveryEnabled;
 }
 
-void OXRS_Room8266::getHassDiscoveryJson(JsonVariant json, char * id, bool isTelemetry)
-{
-  char uniqueId[64];
-  sprintf_P(uniqueId, PSTR("%s_%s"), _mqtt.getClientId(), id);
-  json["uniq_id"] = uniqueId;
-  json["obj_id"] = uniqueId;
-
-  char topic[64];
-  json["stat_t"] = isTelemetry ? _mqtt.getTelemetryTopic(topic) : _mqtt.getStatusTopic(topic);
-  json["avty_t"] = _mqtt.getLwtTopic(topic);
-  json["avty_tpl"] = "{% if value_json.online == true %}online{% else %}offline{% endif %}";
-
-  JsonObject dev = json.createNestedObject("dev");
-  dev["name"] = _mqtt.getClientId();
-  dev["mf"] = FW_MAKER;
-  dev["mdl"] = FW_NAME;
-  dev["sw"] = STRINGIFY(FW_VERSION);
-
-  JsonArray ids = dev.createNestedArray("ids");
-  ids.add(_mqtt.getClientId());
-}
-
 bool OXRS_Room8266::publishHassDiscovery(JsonVariant json, char * component, char * id)
 {
   // Exit early if Home Assistant discovery has been disabled
@@ -497,18 +440,7 @@ bool OXRS_Room8266::publishHassDiscovery(JsonVariant json, char * component, cha
   // Exit early if no network connection
   if (!_isNetworkConnected()) { return false; }
 
-  // Build the discovery topic
-  char topic[64];
-  sprintf_P(topic, PSTR("%s/%s/%s/%s/config"), g_hassDiscoveryTopicPrefix, component, _mqtt.getClientId(), id);
-
-  // Check for a null payload and ensure we send an empty JSON object
-  // to clear any existing Home Assistant config
-  if (json.isNull())
-  {
-    json = json.to<JsonObject>();
-  }
-
-  bool success = _mqtt.publish(json, topic, true);
+  bool success = _mqtt.publishHassDiscovery(json, g_hassDiscoveryTopicPrefix, component, id);
   if (success) { _ledTx(); }
   return success;
 }
