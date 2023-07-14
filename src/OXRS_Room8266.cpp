@@ -467,13 +467,12 @@ bool OXRS_Room8266::isHassDiscoveryEnabled()
   return g_hassDiscoveryEnabled;
 }
 
-void OXRS_Room8266::getHassDiscoveryJson(JsonVariant json, char * id, char * name, bool isTelemetry)
+void OXRS_Room8266::getHassDiscoveryJson(JsonVariant json, char * id, bool isTelemetry)
 {
   char uniqueId[64];
   sprintf_P(uniqueId, PSTR("%s_%s"), _mqtt.getClientId(), id);
   json["uniq_id"] = uniqueId;
   json["obj_id"] = uniqueId;
-  json["name"] = name;
 
   char topic[64];
   json["stat_t"] = isTelemetry ? _mqtt.getTelemetryTopic(topic) : _mqtt.getStatusTopic(topic);
