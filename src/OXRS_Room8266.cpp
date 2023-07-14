@@ -440,6 +440,11 @@ bool OXRS_Room8266::publishHassDiscovery(JsonVariant json, char * component, cha
   // Exit early if no network connection
   if (!_isNetworkConnected()) { return false; }
 
+  // Update the firmware details
+  json["dev"]["mf"] = FW_MAKER;
+  json["dev"]["mdl"] = FW_NAME;
+  json["dev"]["sw"] = STRINGIFY(FW_VERSION);
+
   bool success = _mqtt.publishHassDiscovery(json, g_hassDiscoveryTopicPrefix, component, id);
   if (success) { _ledTx(); }
   return success;
