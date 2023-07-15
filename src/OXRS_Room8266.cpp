@@ -49,6 +49,9 @@ DynamicJsonDocument _fwCommandSchema(JSON_COMMAND_MAX_SIZE);
 jsonCallback _onConfig;
 jsonCallback _onCommand;
 
+// Home Assistant discovery config
+bool  _hassDiscoveryEnabled = false;
+
 // LED timer
 uint32_t _ledOnMillis = 0L;
 
@@ -281,7 +284,7 @@ void _mqttConfig(JsonVariant json)
   // Home Assistant discovery config
   if (json.containsKey("hassDiscoveryEnabled"))
   {
-    _mqtt.setHassDiscoveryEnabled(json["hassDiscoveryEnabled"].as<bool>());
+    _hassDiscoveryEnabled = json["hassDiscoveryEnabled"].as<bool>();
   }
 
   if (json.containsKey("hassDiscoveryTopicPrefix"))
@@ -435,18 +438,27 @@ bool OXRS_Room8266::publishTelemetry(JsonVariant json)
 
 bool OXRS_Room8266::isHassDiscoveryEnabled()
 {
-  return _mqtt.getHassDiscoveryEnabled();
+  return _hassDiscoveryEnabled;
 }
 
-bool OXRS_Room8266::publishHassDiscovery(JsonVariant json, char * component, char * id)
+void OXRS_Room8266::getHassDiscoveryJson(JsonVariant json, char * id)
 {
-  // Exit early if no network connection
-  if (!_isNetworkConnected()) { return false; }
+  _mqtt.getHassDiscoveryJson(json, id);
 
   // Update the firmware details
   json["dev"]["mf"] = FW_MAKER;
   json["dev"]["mdl"] = FW_NAME;
   json["dev"]["sw"] = STRINGIFY(FW_VERSION);
+  json["dev"]["hw"] = "room8266";
+}
+
+bool OXRS_Room8266::publishHassDiscovery(JsonVariant json, char * component, char * id)
+{
+  // Exit early if Home Assistant discovery not enabled
+  if (!_hassDiscoveryEnabled) { return false; }
+  
+  // Exit early if no network connection
+  if (!_isNetworkConnected()) { return false; }
 
   bool success = _mqtt.publishHassDiscovery(json, component, id);
   if (success) { _ledTx(); }

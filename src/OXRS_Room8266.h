@@ -48,6 +48,7 @@ class OXRS_Room8266 : public Print
 
     // Helpers for Home Assistant discovery
     bool isHassDiscoveryEnabled();
+    void getHassDiscoveryJson(JsonVariant json, char * id);
     bool publishHassDiscovery(JsonVariant json, char * component, char * id);
 
     // Implement Print.h wrapper
