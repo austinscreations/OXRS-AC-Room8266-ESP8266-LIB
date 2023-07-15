@@ -449,14 +449,14 @@ void OXRS_Room8266::getHassDiscoveryJson(JsonVariant json, char * id)
   json["dev"]["mf"] = FW_MAKER;
   json["dev"]["mdl"] = FW_NAME;
   json["dev"]["sw"] = STRINGIFY(FW_VERSION);
-  json["dev"]["hw"] = "room8266";
+  json["dev"]["hw"] = "Room8266";
 }
 
 bool OXRS_Room8266::publishHassDiscovery(JsonVariant json, char * component, char * id)
 {
   // Exit early if Home Assistant discovery not enabled
   if (!_hassDiscoveryEnabled) { return false; }
-  
+
   // Exit early if no network connection
   if (!_isNetworkConnected()) { return false; }
 
