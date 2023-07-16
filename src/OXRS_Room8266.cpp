@@ -50,7 +50,7 @@ jsonCallback _onConfig;
 jsonCallback _onCommand;
 
 // Home Assistant discovery config
-bool  _hassDiscoveryEnabled = false;
+bool _hassDiscoveryEnabled = false;
 
 // LED timer
 uint32_t _ledOnMillis = 0L;
