@@ -8,11 +8,14 @@ OXRS_Room8266	KEYWORD1
 # Methods and Functions (KEYWORD2)
 #######################################
 
+begin			KEYWORD2
+loop			KEYWORD2
+
 setConfigSchema	KEYWORD2
 setCommandSchema	KEYWORD2
 
-begin			KEYWORD2
-loop			KEYWORD2
+getMQTT   KEYWORD2
+getAPI    KEYWORD2
 
 publishStatus		KEYWORD2
 publishTelemetry	KEYWORD2
